@@ -1,13 +1,21 @@
 <!doctype html>
 <html lang="vi">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Crypto Signal Radar</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <main class="app-shell">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crypto Signal Radar</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <main class="app-shell">
+    <nav class="tabs-nav">
+      <button id="btnHomeTab" class="tab-btn active">Radar</button>
+      <button id="btnNoteTab" class="tab-btn">Note</button>
+    </nav>
+
+    <div id="homeView">
       <section class="hero card">
         <div>
           <p class="eyebrow">Realtime Crypto AI</p>
@@ -32,7 +40,7 @@
             <option value="NESUSDT">NESUSDT</option>
           </select>
         </label>
-        <label>
+        <label style="display: none;">
           Khung nến
           <select id="intervalSelect">
             <option value="1m">1 phút</option>
@@ -55,10 +63,20 @@
           </select>
         </label>
         <label>
+          Thời gian giữ lệnh
+          <select id="tradeDurationSelect">
+            <option value="scalping">Ngắn hạn (Vài chục phút)</option>
+            <option value="intraday" selected>Trong ngày (1 - 4h)</option>
+            <option value="swing">Dài hạn (Vài ngày)</option>
+          </select>
+        </label>
+        <label>
           Báo động khi tin cậy &gt;= %
           <div style="display: flex; gap: 8px;">
-            <input id="notifyEnable" type="checkbox" style="width: auto; height: 20px; align-self: center;" title="Bật báo động" />
-            <input id="notifyThreshold" type="number" min="50" max="100" value="80" style="padding: 0 8px; flex: 1;" title="Ngưỡng tin cậy (%)" />
+            <input id="notifyEnable" type="checkbox" style="width: auto; height: 20px; align-self: center;"
+              title="Bật báo động" />
+            <input id="notifyThreshold" type="number" min="50" max="100" value="80" style="padding: 0 8px; flex: 1;"
+              title="Ngưỡng tin cậy (%)" />
           </div>
         </label>
         <button id="refreshButton" type="button">Cập nhật</button>
@@ -109,7 +127,8 @@
       <section class="card autofill-card">
         <div>
           <h2>Điền lệnh OKX</h2>
-          <p class="muted">Chỉ điền entry, số lượng coin, TP/SL và đòn bẩy nếu tìm thấy ô nhập. App không bấm Long/Short trên OKX.</p>
+          <p class="muted">Chỉ điền entry, số lượng coin, TP/SL và đòn bẩy nếu tìm thấy ô nhập. App không bấm Long/Short
+            trên OKX.</p>
         </div>
         <div class="trade-buttons">
           <button id="fillLongButton" class="long-button" type="button">Chuẩn bị Long</button>
@@ -119,9 +138,61 @@
       </section>
 
       <section class="card disclaimer">
-        Không phải lời khuyên tài chính. Crypto biến động mạnh; luôn dùng quản trị rủi ro, stop-loss và chỉ giao dịch số vốn có thể mất.
+        Không phải lời khuyên tài chính. Crypto biến động mạnh; luôn dùng quản trị rủi ro, stop-loss và chỉ giao dịch số
+        vốn có thể mất.
       </section>
-    </main>
-    <script src="popup.js"></script>
-  </body>
+    </div> <!-- /homeView -->
+
+    <div id="noteView" style="display: none;">
+      <section class="card">
+        <h2>Báo Cáo Tài Chính (Tổng Quan)</h2>
+        <div class="metric-row">
+          <span class="label">Số dư hiện tại:</span>
+          <strong id="noteBalance" style="font-size: 1.2rem;">0 USDT</strong>
+        </div>
+        <div class="metric-row">
+          <span class="label">Rủi ro (Risk Profile):</span>
+          <strong id="noteRiskProfile" style="color: var(--text-muted)">Cân bằng</strong>
+        </div>
+        <div class="metric-row" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+          <span class="label">Khuyến nghị vốn/lệnh:</span>
+          <strong id="noteMaxInvest" style="color: var(--accent); font-size: 1.2rem;">0 USDT</strong>
+        </div>
+        <p class="muted" style="margin-top: 8px;">Dựa trên nguyên tắc chỉ rủi ro 1-3% tổng tài khoản cho mỗi lệnh cắt
+          lỗ.</p>
+      </section>
+
+      <section class="card">
+        <h2>Analysis Giao dịch Vĩ mô</h2>
+        <p class="muted" style="margin-bottom: 12px;">Phân tích dòng tiền và xu hướng dài hạn (D1, H4) để lên kế hoạch.
+        </p>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <input type="text" id="noteSymbolInput" placeholder="Ví dụ: BTCUSDT" style="flex: 1;" />
+          <button id="btnAnalyzeNote" type="button"
+            style="background: var(--accent); color: #000; font-weight: bold;">Phân tích</button>
+        </div>
+
+        <div id="noteAnalysisLoading" class="muted" style="display: none; text-align: center; padding: 20px 0;">
+          Đang tải dữ liệu lịch sử từ sàn...
+        </div>
+
+        <div id="noteAnalysisResult" style="display: none;">
+          <div class="analysis-box">
+            <h3 style="font-size: 0.95rem; margin-bottom: 6px; color: var(--text);">Phân tích Kỹ thuật</h3>
+            <p id="noteTechnicalText"
+              style="line-height: 1.5; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 12px;"></p>
+
+            <h3 style="font-size: 0.95rem; margin-bottom: 6px; color: var(--text);">Kế hoạch tỉ mỉ</h3>
+            <div id="notePlanText"
+              style="line-height: 1.6; color: var(--accent); font-size: 0.95rem; background: rgba(0, 255, 170, 0.05); padding: 10px; border-radius: 6px; border-left: 3px solid var(--accent);">
+            </div>
+          </div>
+        </div>
+      </section>
+    </div> <!-- /noteView -->
+  </main>
+  <script src="popup.js"></script>
+</body>
+
 </html>
