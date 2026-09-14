@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crypto Signal Radar</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero card">
+        <div>
+          <p class="eyebrow">Realtime Crypto AI</p>
+          <h1>Crypto Signal Radar</h1>
+          <p class="muted">Phân tích kỹ thuật realtime từ giá, khối lượng, order book và động lượng thị trường.</p>
+        </div>
+        <div class="status" id="connectionStatus">Đang kết nối</div>
+      </section>
+
+      <section class="controls card">
+        <label>
+          Cặp giao dịch
+          <select id="symbolSelect">
+            <option value="BTCUSDT">BTC/USDT</option>
+            <option value="ETHUSDT">ETH/USDT</option>
+            <option value="SOLUSDT">SOL/USDT</option>
+            <option value="BNBUSDT">BNB/USDT</option>
+            <option value="XRPUSDT">XRP/USDT</option>
+            <option value="DOGEUSDT">DOGE/USDT</option>
+            <option value="ADAUSDT">ADA/USDT</option>
+            <option value="AVAXUSDT">AVAX/USDT</option>
+            <option value="NESUSDT">NESUSDT</option>
+          </select>
+        </label>
+        <label>
+          Khung nến
+          <select id="intervalSelect">
+            <option value="1m">1 phút</option>
+            <option value="5m">5 phút</option>
+            <option value="15m" selected>15 phút</option>
+            <option value="1h">1 giờ</option>
+            <option value="4h">4 giờ</option>
+          </select>
+        </label>
+        <label>
+          Vốn ví hiện tại (USDT)
+          <input id="capitalInput" type="number" min="0" step="0.01" placeholder="Ví dụ: 100" />
+        </label>
+        <label>
+          Mức độ rủi ro
+          <select id="riskProfileSelect">
+            <option value="safe">An toàn</option>
+            <option value="balanced" selected>Cân bằng</option>
+            <option value="aggressive">Mạo hiểm</option>
+          </select>
+        </label>
+        <label>
+          Báo động khi tin cậy &gt;= %
+          <div style="display: flex; gap: 8px;">
+            <input id="notifyEnable" type="checkbox" style="width: auto; height: 20px; align-self: center;" title="Bật báo động" />
+            <input id="notifyThreshold" type="number" min="50" max="100" value="80" style="padding: 0 8px; flex: 1;" title="Ngưỡng tin cậy (%)" />
+          </div>
+        </label>
+        <button id="refreshButton" type="button">Cập nhật</button>
+      </section>
+
+      <section class="price-grid">
+        <article class="card metric">
+          <span>Giá hiện tại</span>
+          <strong id="lastPrice">--</strong>
+          <small id="priceChange">--</small>
+        </article>
+        <article class="card metric">
+          <span>Tín hiệu</span>
+          <strong id="signalText">--</strong>
+          <small id="confidenceText">Độ tin cậy --</small>
+        </article>
+        <article class="card metric">
+          <span>Dự đoán gần</span>
+          <strong id="forecastText">--</strong>
+          <small id="horizonText">15–60 phút</small>
+        </article>
+        <article class="card metric">
+          <span>Đòn bẩy nên dùng</span>
+          <strong id="leverageText">--</strong>
+          <small id="leverageReason">Theo rủi ro hiện tại</small>
+        </article>
+      </section>
+
+      <section class="card chart-card">
+        <div class="section-title">
+          <h2>Biểu đồ giá</h2>
+          <span id="updatedAt">--</span>
+        </div>
+        <canvas id="priceChart" width="620" height="260" aria-label="Price chart"></canvas>
+      </section>
+
+      <section class="analysis-grid">
+        <article class="card">
+          <h2>Chỉ báo</h2>
+          <div class="indicator-list" id="indicatorList"></div>
+        </article>
+        <article class="card">
+          <h2>Chiến lược</h2>
+          <ul class="strategy" id="strategyList"></ul>
+        </article>
+      </section>
+
+      <section class="card autofill-card">
+        <div>
+          <h2>Điền lệnh OKX</h2>
+          <p class="muted">Chỉ điền entry, số lượng coin, TP/SL và đòn bẩy nếu tìm thấy ô nhập. App không bấm Long/Short trên OKX.</p>
+        </div>
+        <div class="trade-buttons">
+          <button id="fillLongButton" class="long-button" type="button">Chuẩn bị Long</button>
+          <button id="fillShortButton" class="short-button" type="button">Chuẩn bị Short</button>
+        </div>
+        <p class="fill-status" id="fillStatus">Mở OKX ở tab chính trước khi bấm.</p>
+      </section>
+
+      <section class="card disclaimer">
+        Không phải lời khuyên tài chính. Crypto biến động mạnh; luôn dùng quản trị rủi ro, stop-loss và chỉ giao dịch số vốn có thể mất.
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

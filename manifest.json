@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Crypto Signal Radar",
+  "version": "1.0.0",
+  "description": "Real-time crypto analysis dashboard with technical indicators and risk-aware signals.",
+  "action": {
+    "default_title": "Crypto Signal Radar"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "sidePanel", "activeTab", "scripting", "tabs", "notifications"],
+  "host_permissions": [
+    "https://api.binance.com/*",
+    "wss://stream.binance.com:9443/*",
+    "https://www.okx.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.okx.com/*"],
+      "js": ["okx-autofill.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  }
+}
