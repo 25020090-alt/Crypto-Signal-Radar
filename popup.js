@@ -462,8 +462,8 @@ function render() {
       chrome.notifications.create({
         type: "basic",
         iconUrl: "icons/icon128.svg",
-        title: `Tín hiệu ${result.bias} ${state.symbol}`,
-        message: `Độ tin cậy đạt ${result.confidence}%. Khuyên dùng đòn bẩy ${result.leverage.value}.`
+        title: `🔥 CƠ HỘI ${result.bias} ${state.symbol} 🔥`,
+        message: `Độ tin cậy đạt ${result.confidence}%. Tín hiệu rất đẹp, bạn NÊN VÀO LỆNH ngay! (Đòn bẩy: ${result.leverage.value})`
       });
     }
   }
@@ -585,11 +585,39 @@ async function refresh() {
   state.capital = Math.max(0, Number(els.capitalInput.value) || 0);
   state.riskProfile = els.riskProfileSelect.value;
   await chrome.storage.local.set({ symbol: state.symbol, interval: state.interval, capital: state.capital, riskProfile: state.riskProfile });
+  fetchOkxBalance(); // Lấy số dư mới mỗi khi refresh
   try {
     await loadInitialMarket();
   } catch (error) {
     console.error(error);
     setStatus("Không tải được dữ liệu", "error");
+  }
+}
+
+async function fetchOkxBalance() {
+  try {
+    const tabs = await chrome.tabs.query({ url: "*://*.okx.com/*" });
+    const tab = tabs.find((t) => t.active) || tabs[0];
+    if (!tab?.id) return;
+
+    let response;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, { type: "GET_OKX_INFO" });
+    } catch (error) {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["okx-autofill.js"] });
+      response = await chrome.tabs.sendMessage(tab.id, { type: "GET_OKX_INFO" });
+    }
+
+    if (response?.ok && typeof response.balance === "number" && !isNaN(response.balance)) {
+      if (state.capital !== response.balance) {
+        state.capital = response.balance;
+        els.capitalInput.value = state.capital;
+        chrome.storage.local.set({ capital: state.capital });
+        render();
+      }
+    }
+  } catch (error) {
+    console.warn("Không thể quét số dư OKX:", error.message);
   }
 }
 
@@ -615,10 +643,26 @@ async function boot() {
   els.notifyEnable.addEventListener("change", () => {
     state.notifyEnable = els.notifyEnable.checked;
     chrome.storage.local.set({ notifyEnable: state.notifyEnable });
+    if (state.notifyEnable) {
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "icons/icon128.svg",
+        title: `Bật báo động`,
+        message: `Hệ thống sẽ báo khi độ tin cậy từ ${state.notifyThreshold}% trở lên.`
+      });
+    }
   });
-  els.notifyThreshold.addEventListener("input", () => {
+  els.notifyThreshold.addEventListener("change", () => {
     state.notifyThreshold = Number(els.notifyThreshold.value) || 80;
     chrome.storage.local.set({ notifyThreshold: state.notifyThreshold });
+    if (state.notifyEnable) {
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "icons/icon128.svg",
+        title: `Cập nhật mức báo động`,
+        message: `Đã lưu! Sẽ thông báo khi độ tin cậy đạt ${state.notifyThreshold}%`
+      });
+    }
   });
   els.riskProfileSelect.addEventListener("change", () => {
     state.riskProfile = els.riskProfileSelect.value;
@@ -630,7 +674,9 @@ async function boot() {
     chrome.storage.local.set({ capital: state.capital });
     render();
   });
-  refresh();
+  
+  await refresh();
+  fetchOkxBalance(); // Ngay khi bật lên điều đầu tiên là theo dõi số dư khả dụng
 }
 
 boot();
