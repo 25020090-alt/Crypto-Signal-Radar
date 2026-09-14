@@ -1,8 +1,10 @@
 const state = {
   symbol: "BTCUSDT",
   interval: "15m",
+  contextCandles: [],
   capital: 0,
   riskProfile: "balanced",
+  tradeDuration: "intraday",
   notifyEnable: false,
   notifyThreshold: 80,
   lastNotificationTime: 0,
@@ -11,6 +13,7 @@ const state = {
   depth: null,
   socket: null,
   poller: null,
+  lastBias: "TRUNG LẬP",
 };
 
 const els = {
@@ -19,6 +22,7 @@ const els = {
   intervalSelect: document.querySelector("#intervalSelect"),
   capitalInput: document.querySelector("#capitalInput"),
   riskProfileSelect: document.querySelector("#riskProfileSelect"),
+  tradeDurationSelect: document.querySelector("#tradeDurationSelect"),
   notifyEnable: document.querySelector("#notifyEnable"),
   notifyThreshold: document.querySelector("#notifyThreshold"),
   refreshButton: document.querySelector("#refreshButton"),
@@ -37,6 +41,19 @@ const els = {
   fillShortButton: document.querySelector("#fillShortButton"),
   fillStatus: document.querySelector("#fillStatus"),
   chart: document.querySelector("#priceChart"),
+  btnHomeTab: document.querySelector("#btnHomeTab"),
+  btnNoteTab: document.querySelector("#btnNoteTab"),
+  homeView: document.querySelector("#homeView"),
+  noteView: document.querySelector("#noteView"),
+  noteBalance: document.querySelector("#noteBalance"),
+  noteRiskProfile: document.querySelector("#noteRiskProfile"),
+  noteMaxInvest: document.querySelector("#noteMaxInvest"),
+  noteSymbolInput: document.querySelector("#noteSymbolInput"),
+  btnAnalyzeNote: document.querySelector("#btnAnalyzeNote"),
+  noteAnalysisLoading: document.querySelector("#noteAnalysisLoading"),
+  noteAnalysisResult: document.querySelector("#noteAnalysisResult"),
+  noteTechnicalText: document.querySelector("#noteTechnicalText"),
+  notePlanText: document.querySelector("#notePlanText"),
 };
 
 const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 });
@@ -63,34 +80,46 @@ function okxInstId(symbol) {
 }
 
 function okxBar(interval) {
-  return interval === "1m" ? "1m" : interval === "5m" ? "5m" : interval === "15m" ? "15m" : interval === "1h" ? "1H" : "4H";
+  return interval === "1m" ? "1m" : interval === "5m" ? "5m" : interval === "15m" ? "15m" : interval === "1h" ? "1H" : interval === "4h" ? "4H" : "1D";
+}
+
+function getIntervals() {
+  if (state.tradeDuration === "scalping") return { trigger: "5m", context: "15m", horizon: "15 - 45 phút" };
+  if (state.tradeDuration === "swing") return { trigger: "4h", context: "1d", horizon: "2 - 7 ngày" };
+  return { trigger: "15m", context: "1h", horizon: "4 - 12 giờ" };
 }
 
 async function loadInitialMarket() {
   setStatus("Đang tải dữ liệu", "");
+  const { trigger, context } = getIntervals();
+  state.interval = trigger;
+
   if (isOkxSymbol(state.symbol)) {
-    await loadOkxMarket();
+    await loadOkxMarket(context);
     return;
   }
 
-  const [klines, ticker, depth] = await Promise.all([
-    fetchJson(`https://api.binance.com/api/v3/klines?symbol=${state.symbol}&interval=${state.interval}&limit=160`),
+  const [klines, contextKlines, ticker, depth] = await Promise.all([
+    fetchJson(`https://api.binance.com/api/v3/klines?symbol=${state.symbol}&interval=${trigger}&limit=160`),
+    fetchJson(`https://api.binance.com/api/v3/klines?symbol=${state.symbol}&interval=${context}&limit=100`),
     fetchJson(`https://api.binance.com/api/v3/ticker/24hr?symbol=${state.symbol}`),
     fetchJson(`https://api.binance.com/api/v3/depth?symbol=${state.symbol}&limit=20`),
   ]);
 
   state.candles = klines.map(toCandle);
+  state.contextCandles = contextKlines.map(toCandle);
   state.ticker = ticker;
   state.depth = depth;
   render();
   connectRealtime();
 }
 
-async function loadOkxMarket() {
+async function loadOkxMarket(context) {
   closeRealtime();
   const instId = okxInstId(state.symbol);
-  const [candlesRes, tickerRes, depthRes] = await Promise.all([
+  const [candlesRes, contextRes, tickerRes, depthRes] = await Promise.all([
     fetchJson(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=${okxBar(state.interval)}&limit=160`),
+    fetchJson(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=${okxBar(context)}&limit=100`),
     fetchJson(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`),
     fetchJson(`https://www.okx.com/api/v5/market/books?instId=${instId}&sz=20`),
   ]);
@@ -100,6 +129,7 @@ async function loadOkxMarket() {
   }
 
   state.candles = candlesRes.data.map(toOkxCandle).reverse();
+  state.contextCandles = contextRes.code === "0" ? contextRes.data.map(toOkxCandle).reverse() : [];
   state.ticker = toOkxTicker(tickerRes.data[0]);
   state.depth = toOkxDepth(depthRes.data[0]);
   render();
@@ -333,14 +363,25 @@ function tradePlan(result, forcedSide = null) {
   const profile = riskProfileConfig();
   const planBias = forcedSide || result.bias;
   const direction = planBias === "SHORT" ? -1 : planBias === "LONG" ? 1 : 0;
+
+  let atrMultiplierSL = 1.2;
+  let atrMultiplierTP = 1.8;
+  if (state.tradeDuration === "scalping") {
+    atrMultiplierSL = 0.6;
+    atrMultiplierTP = 1.0;
+  } else if (state.tradeDuration === "swing") {
+    atrMultiplierSL = 2.4;
+    atrMultiplierTP = 4.0;
+  }
+
   const entryOffset = result.atr14 ? result.atr14 * 0.12 * direction : result.last * 0.001 * direction;
   const entry = direction === 0 ? result.last : result.last + entryOffset;
   const stop = direction === 0
     ? result.last
-    : entry - direction * (result.atr14 ? result.atr14 * 1.2 : result.last * 0.01);
+    : entry - direction * (result.atr14 ? result.atr14 * atrMultiplierSL : result.last * 0.01);
   const takeProfit = direction === 0
     ? result.last
-    : entry + direction * (result.atr14 ? result.atr14 * 1.8 : result.last * 0.015);
+    : entry + direction * (result.atr14 ? result.atr14 * atrMultiplierTP : result.last * 0.015);
   const leverageNumber = parseLeverageValue(result.leverage);
   const walletBalance = state.capital;
   const riskPercent = riskPercentFor(result);
@@ -420,7 +461,14 @@ async function fillOkxOrder(side) {
 function analyze() {
   const closes = state.candles.map((item) => item.close);
   const volumes = state.candles.map((item) => item.volume);
+  const highs = state.candles.map((item) => item.high);
+  const lows = state.candles.map((item) => item.low);
   const last = closes.at(-1) ?? Number(state.ticker?.lastPrice ?? state.ticker?.c ?? 0);
+  
+  const contextCloses = state.contextCandles.map((item) => item.close);
+  const contextHighs = state.contextCandles.map((item) => item.high);
+  const contextLows = state.contextCandles.map((item) => item.low);
+
   const ema12 = ema(closes, 12);
   const ema26 = ema(closes, 26);
   const rsi14 = rsi(closes);
@@ -430,22 +478,85 @@ function analyze() {
   const volumeRatio = volumes.length >= 21 ? volumes.at(-1) / Math.max(sma(volumes.slice(0, -1), 20), 1) : 1;
   const imbalance = orderBookImbalance(state.depth);
 
+  const contextEma50 = ema(contextCloses, 50);
+  const contextEma200 = ema(contextCloses, 200);
+  const macroResist = contextHighs.length ? Math.max(...contextHighs.slice(-30)) : last;
+  const macroSupport = contextLows.length ? Math.min(...contextLows.slice(-30)) : last;
+
+  // --- Thu thập mốc nến (Market Structure) ---
+  const sessionLength = Math.min(40, highs.length);
+  const sessionHigh = sessionLength > 0 ? Math.max(...highs.slice(-sessionLength)) : last;
+  const sessionLow = sessionLength > 0 ? Math.min(...lows.slice(-sessionLength)) : last;
+  const sessionRange = sessionHigh - sessionLow;
+  
+  // Xác định thị trường giằng co (Choppy Market)
+  const isInsideRange = last > sessionLow + sessionRange * 0.15 && last < sessionHigh - sessionRange * 0.15;
+  const isNarrowRange = atr14 && sessionRange > 0 ? (sessionRange / last) < (atr14 * 2.5 / last) : false;
+  const isChoppy = isInsideRange && isNarrowRange;
+
   let score = 0;
-  if (ema12 && ema26) score += ema12 > ema26 ? 22 : -22;
-  if (rsi14 !== null) score += rsi14 < 30 ? 18 : rsi14 > 70 ? -18 : rsi14 > 52 ? 8 : rsi14 < 48 ? -8 : 0;
-  if (macdValue !== null) score += macdValue > 0 ? 16 : -16;
-  if (bands) score += last < bands.lower ? 12 : last > bands.upper ? -12 : last > bands.middle ? 6 : -6;
-  score += Math.max(-16, Math.min(16, imbalance * 40));
-  score += volumeRatio > 1.4 ? Math.sign(score || 1) * 8 : 0;
+
+  if (state.tradeDuration === "scalping") {
+    if (rsi14 !== null) score += rsi14 < 30 ? 30 : rsi14 > 70 ? -30 : rsi14 > 55 ? 12 : rsi14 < 45 ? -12 : 0;
+    score += Math.max(-30, Math.min(30, imbalance * 60)); // Double weight for orderbook
+    if (bands) score += last <= bands.lower * 1.001 ? 25 : last >= bands.upper * 0.999 ? -25 : 0;
+    // MTFA Filter: Follow 15m trend
+    if (contextEma50 && last < contextEma50) score -= 15;
+    if (contextEma50 && last > contextEma50) score += 15;
+    score += volumeRatio > 1.4 ? Math.sign(score || 1) * 10 : 0;
+  } else if (state.tradeDuration === "swing") {
+    if (contextEma50 && contextEma200) {
+      if (last > contextEma50 && contextEma50 > contextEma200) score += 40;
+      if (last < contextEma50 && contextEma50 < contextEma200) score -= 40;
+    }
+    if (ema12 && ema26) score += ema12 > ema26 ? 30 : -30;
+    if (last <= macroSupport * 1.02) score += 20; // Near macro support
+    if (last >= macroResist * 0.98) score -= 20; // Near macro resist
+    if (rsi14 !== null && rsi14 < 30) score += 15;
+    if (rsi14 !== null && rsi14 > 70) score -= 15;
+    // Ignore orderbook completely
+  } else {
+    // Intraday (Mặc định)
+    if (ema12 && ema26) score += ema12 > ema26 ? 22 : -22;
+    if (rsi14 !== null) score += rsi14 < 30 ? 18 : rsi14 > 70 ? -18 : rsi14 > 52 ? 8 : rsi14 < 48 ? -8 : 0;
+    if (macdValue !== null) score += macdValue > 0 ? 16 : -16;
+    if (bands) score += last < bands.lower ? 12 : last > bands.upper ? -12 : last > bands.middle ? 6 : -6;
+    score += Math.max(-16, Math.min(16, imbalance * 40));
+    score += volumeRatio > 1.4 ? Math.sign(score || 1) * 8 : 0;
+    if (contextEma50 && last > contextEma50) score += 12;
+    if (contextEma50 && last < contextEma50) score -= 12;
+    // Breakout mốc nến
+    if (sessionRange > 0 && last >= sessionHigh * 0.999 && volumeRatio > 1.2) score += 18;
+    if (sessionRange > 0 && last <= sessionLow * 1.001 && volumeRatio > 1.2) score -= 18;
+  }
+
+  let longThreshold = 24;
+  let shortThreshold = -24;
+
+  // Lọc nhiễu: Ép điểm về gần 0 và tăng ngưỡng kích hoạt nếu thị trường đi ngang
+  if (isChoppy) {
+    longThreshold = 34;
+    shortThreshold = -34;
+    score = score * 0.55; 
+  }
 
   const confidence = Math.min(94, Math.max(35, Math.round(50 + Math.abs(score) * 0.55 + Math.min(volumeRatio, 2) * 5)));
-  const bias = score > 24 ? "LONG" : score < -24 ? "SHORT" : "TRUNG LẬP";
-  const direction = score > 24 ? 1 : score < -24 ? -1 : 0;
+  
+  let bias = "TRUNG LẬP";
+  if (score > longThreshold) bias = "LONG";
+  else if (score < shortThreshold) bias = "SHORT";
+
+  // Cơ chế chống nhiễu (Hysteresis): Giữ tín hiệu cũ nếu điểm chỉ bị rớt nhẹ xuống vùng Trung lập
+  if (state.lastBias === "LONG" && bias === "TRUNG LẬP" && score > 12) bias = "LONG";
+  if (state.lastBias === "SHORT" && bias === "TRUNG LẬP" && score < -12) bias = "SHORT";
+  state.lastBias = bias;
+
+  const direction = bias === "LONG" ? 1 : bias === "SHORT" ? -1 : 0;
   const expectedMove = atr14 ? atr14 * (0.6 + confidence / 180) : last * 0.006;
   const forecast = direction === 0 ? last : last + direction * expectedMove;
   const leverage = recommendLeverage({ bias, confidence, atr14, last, volumeRatio, rsi14 });
 
-  return { last, ema12, ema26, rsi14, macdValue, bands, atr14, volumeRatio, imbalance, score, confidence, bias, forecast, leverage };
+  return { last, ema12, ema26, rsi14, macdValue, bands, atr14, volumeRatio, imbalance, score, confidence, bias, forecast, leverage, sessionHigh, sessionLow };
 }
 
 function render() {
@@ -461,9 +572,9 @@ function render() {
       state.lastNotificationTime = now;
       chrome.notifications.create({
         type: "basic",
-        iconUrl: "icons/icon128.svg",
-        title: `Tín hiệu ${result.bias} ${state.symbol}`,
-        message: `Độ tin cậy đạt ${result.confidence}%. Khuyên dùng đòn bẩy ${result.leverage.value}.`
+        iconUrl: "icons/logo.png",
+        title: `🔥 CƠ HỘI ${result.bias} ${state.symbol} 🔥`,
+        message: `Độ tin cậy đạt ${result.confidence}%. Tín hiệu rất đẹp, bạn NÊN VÀO LỆNH ngay! (Đòn bẩy: ${result.leverage.value})`
       });
     }
   }
@@ -476,7 +587,8 @@ function render() {
   els.confidenceText.textContent = `Độ tin cậy ${result.confidence}% | Điểm ${Math.round(result.score)}`;
   els.forecastText.textContent = `$${fmt.format(result.forecast)}`;
   els.forecastText.className = signalClass;
-  els.horizonText.textContent = `Mục tiêu gần theo ATR: ${result.atr14 ? fmt.format(result.atr14) : "--"}`;
+  const { horizon } = getIntervals();
+  els.horizonText.textContent = `Dự báo cho ${horizon}`;
   els.leverageText.textContent = result.leverage.value;
   els.leverageText.className = signalClass;
   els.leverageReason.textContent = result.leverage.reason;
@@ -489,11 +601,11 @@ function render() {
 
 function renderIndicators(result) {
   const items = [
+    ["Cấu trúc 40 nến", result.sessionHigh ? `${fmt.format(result.sessionLow)} – ${fmt.format(result.sessionHigh)}` : "Đang tính"],
     ["EMA 12/26", result.ema12 && result.ema26 ? `${fmt.format(result.ema12)} / ${fmt.format(result.ema26)}` : "Đang tính"],
     ["RSI 14", result.rsi14 !== null ? fmt.format(result.rsi14) : "Đang tính"],
     ["MACD", result.macdValue !== null ? fmt.format(result.macdValue) : "Đang tính"],
     ["Bollinger", result.bands ? `${fmt.format(result.bands.lower)} – ${fmt.format(result.bands.upper)}` : "Đang tính"],
-    ["Order book", `${pct.format(result.imbalance * 100)}% nghiêng ${result.imbalance >= 0 ? "mua" : "bán"}`],
     ["Volume", `${fmt.format(result.volumeRatio)}x so với trung bình`],
   ];
   els.indicatorList.innerHTML = items.map(([label, value]) => `<div class="indicator"><b>${label}</b><span>${value}</span></div>`).join("");
@@ -581,10 +693,16 @@ function drawChart(result) {
 
 async function refresh() {
   state.symbol = els.symbolSelect.value;
-  state.interval = els.intervalSelect.value;
+  // Interval is now auto-mapped from tradeDuration
   state.capital = Math.max(0, Number(els.capitalInput.value) || 0);
   state.riskProfile = els.riskProfileSelect.value;
-  await chrome.storage.local.set({ symbol: state.symbol, interval: state.interval, capital: state.capital, riskProfile: state.riskProfile });
+  state.tradeDuration = els.tradeDurationSelect.value;
+  
+  const { trigger } = getIntervals();
+  state.interval = trigger;
+  
+  await chrome.storage.local.set({ symbol: state.symbol, interval: state.interval, capital: state.capital, riskProfile: state.riskProfile, tradeDuration: state.tradeDuration });
+  updateNoteBalance();
   try {
     await loadInitialMarket();
   } catch (error) {
@@ -593,18 +711,114 @@ async function refresh() {
   }
 }
 
+function updateNoteBalance() {
+  if (!els.noteBalance) return;
+  els.noteBalance.textContent = `${fmt.format(state.capital)} USDT`;
+  const maxRiskPercent = state.riskProfile === "safe" ? 0.01 : state.riskProfile === "balanced" ? 0.02 : 0.03;
+  const maxRisk = state.capital * maxRiskPercent;
+
+  let atrMultiplier = 1.5;
+  if (state.tradeDuration === "scalping") atrMultiplier = 0.8;
+  else if (state.tradeDuration === "swing") atrMultiplier = 2.5;
+
+  els.noteRiskProfile.textContent = state.riskProfile === "safe" ? "An toàn (1%)" : state.riskProfile === "balanced" ? "Cân bằng (2%)" : "Mạo hiểm (3%)";
+  els.noteMaxInvest.textContent = `${fmt.format(maxRisk)} USDT / lệnh (Cắt lỗ tối đa)`;
+}
+
+async function analyzeNoteTab() {
+  const symbol = els.noteSymbolInput.value.trim().toUpperCase() || "BTCUSDT";
+  els.noteSymbolInput.value = symbol;
+  els.noteAnalysisResult.style.display = "none";
+  els.noteAnalysisLoading.style.display = "block";
+
+  try {
+    let closes1d, closes4h, data1d, data4h, lastPrice;
+    
+    if (isOkxSymbol(symbol)) {
+      const instId = okxInstId(symbol);
+      const [res1d, res4h] = await Promise.all([
+        fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1D&limit=100`),
+        fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=4H&limit=100`)
+      ]);
+      const json1d = await res1d.json();
+      const json4h = await res4h.json();
+      if (json1d.code !== "0" || json4h.code !== "0") throw new Error("Không tìm thấy dữ liệu Coin trên sàn OKX");
+      
+      data1d = json1d.data.map(toOkxCandle).reverse();
+      data4h = json4h.data.map(toOkxCandle).reverse();
+    } else {
+      const [res1d, res4h] = await Promise.all([
+        fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=100`),
+        fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=4h&limit=100`)
+      ]);
+      if (!res1d.ok || !res4h.ok) throw new Error("Không tìm thấy dữ liệu Coin trên sàn Binance");
+      const json1d = await res1d.json();
+      const json4h = await res4h.json();
+      
+      data1d = json1d.map(toCandle);
+      data4h = json4h.map(toCandle);
+    }
+
+    closes1d = data1d.map(c => c.close);
+    closes4h = data4h.map(c => c.close);
+    lastPrice = closes1d[closes1d.length - 1];
+
+    const ema50_1d = ema(closes1d, 50);
+    const rsi_4h = rsi(closes4h, 14);
+    const macd_1d = macd(closes1d);
+    
+    const highs1d = data1d.map(c => c.high).slice(-30);
+    const lows1d = data1d.map(c => c.low).slice(-30);
+    const resist = Math.max(...highs1d);
+    const support = Math.min(...lows1d);
+
+    let trendD1 = "Sideways (Đi ngang)";
+    if (ema50_1d && lastPrice > ema50_1d && macd_1d > 0) trendD1 = "TĂNG (Bullish)";
+    else if (ema50_1d && lastPrice < ema50_1d && macd_1d < 0) trendD1 = "GIẢM (Bearish)";
+
+    els.noteTechnicalText.innerHTML = `
+      - <b>Xu hướng dài hạn (D1):</b> <span style="color: ${trendD1.includes("TĂNG") ? "var(--green)" : trendD1.includes("GIẢM") ? "var(--red)" : "var(--yellow)"}">${trendD1}</span> <br/>
+      - <b>Hỗ trợ vĩ mô:</b> $${fmt.format(support)} <br/>
+      - <b>Kháng cự vĩ mô:</b> $${fmt.format(resist)} <br/>
+      - <b>Động lượng trung hạn (4H RSI):</b> ${rsi_4h.toFixed(1)} ${rsi_4h > 70 ? "(Quá mua)" : rsi_4h < 30 ? "(Quá bán)" : "(Bình thường)"}
+    `;
+
+    let plan = "";
+    if (trendD1.includes("TĂNG")) {
+      if (rsi_4h > 70) plan = `Thị trường đang trong xu hướng TĂNG mạnh nhưng khung 4H đã <b>QUÁ MUA</b>. Không nên FOMO lúc này.<br/><br/><b>Kế hoạch tỉ mỉ:</b> Kiên nhẫn chờ giá điều chỉnh (pullback) về gần vùng hỗ trợ $${fmt.format(support)} hoặc khi RSI 4H hạ nhiệt xuống dưới 50 để tìm lệnh LONG.`;
+      else plan = `Xu hướng chính là TĂNG. Khung 4H đang ủng hộ nhịp tăng tiếp diễn.<br/><br/><b>Kế hoạch tỉ mỉ:</b> Tìm điểm vào lệnh LONG quanh mức giá hiện tại ($${fmt.format(lastPrice)}), đặt Stop-loss tuyệt đối ở $${fmt.format(support * 0.99)} (dưới mốc hỗ trợ vĩ mô). Chia vốn theo tỷ lệ Rủi ro ở trên.`;
+    } else if (trendD1.includes("GIẢM")) {
+      if (rsi_4h < 30) plan = `Thị trường đang trong xu hướng GIẢM nhưng khung 4H đã <b>QUÁ BÁN</b>. Dễ có nhịp hồi kỹ thuật.<br/><br/><b>Kế hoạch tỉ mỉ:</b> Không nên đuổi lệnh SHORT ở đây. Chờ giá hồi lên kiểm tra lại vùng kháng cự $${fmt.format(resist)} để tìm lệnh SHORT xuống.`;
+      else plan = `Xu hướng chính là GIẢM. Động lượng phe bán vẫn kiểm soát.<br/><br/><b>Kế hoạch tỉ mỉ:</b> Canh các nhịp hồi nhẹ để rải lệnh SHORT, đặt Stop-loss tuyệt đối ở $${fmt.format(resist * 1.01)} (trên mốc kháng cự vĩ mô). Đánh đúng khối lượng khuyến nghị.`;
+    } else {
+      plan = `Thị trường đang bị kẹp trong hộp <b>Darvas vĩ mô</b> (Hỗ trợ $${fmt.format(support)} - Kháng cự $${fmt.format(resist)}).<br/><br/><b>Kế hoạch tỉ mỉ:</b> Đánh Ping-Pong (Mua ở Hỗ trợ, Bán ở Kháng cự). Canh giá về $${fmt.format(support)} để LONG hoặc lên $${fmt.format(resist)} để SHORT. Khuyến nghị giảm nửa khối lượng lệnh so với bình thường.`;
+    }
+
+    els.notePlanText.innerHTML = plan;
+    els.noteAnalysisLoading.style.display = "none";
+    els.noteAnalysisResult.style.display = "block";
+  } catch (err) {
+    els.noteAnalysisLoading.style.display = "none";
+    els.noteAnalysisResult.style.display = "block";
+    els.noteTechnicalText.innerHTML = "";
+    els.notePlanText.innerHTML = `<span style="color:var(--red);">Lỗi: ${err.message}. Đảm bảo mã coin đúng (ví dụ BTCUSDT) hoặc thử lại sau.</span>`;
+  }
+}
+
 async function boot() {
-  const saved = await chrome.storage.local.get(["symbol", "interval", "capital", "riskProfile", "notifyEnable", "notifyThreshold"]);
+  const saved = await chrome.storage.local.get(["symbol", "interval", "capital", "riskProfile", "tradeDuration", "notifyEnable", "notifyThreshold"]);
   state.symbol = saved.symbol || state.symbol;
   state.interval = saved.interval || state.interval;
   state.capital = Number(saved.capital) || state.capital;
   state.riskProfile = saved.riskProfile || state.riskProfile;
+  state.tradeDuration = saved.tradeDuration || state.tradeDuration;
   state.notifyEnable = saved.notifyEnable ?? state.notifyEnable;
   state.notifyThreshold = saved.notifyThreshold ?? state.notifyThreshold;
   els.symbolSelect.value = state.symbol;
   els.intervalSelect.value = state.interval;
   els.capitalInput.value = state.capital || "";
   els.riskProfileSelect.value = state.riskProfile;
+  if (els.tradeDurationSelect) els.tradeDurationSelect.value = state.tradeDuration;
   els.notifyEnable.checked = state.notifyEnable;
   els.notifyThreshold.value = state.notifyThreshold;
   els.refreshButton.addEventListener("click", refresh);
@@ -615,21 +829,64 @@ async function boot() {
   els.notifyEnable.addEventListener("change", () => {
     state.notifyEnable = els.notifyEnable.checked;
     chrome.storage.local.set({ notifyEnable: state.notifyEnable });
+    if (state.notifyEnable) {
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "icons/logo.png",
+        title: `Bật báo động`,
+        message: `Hệ thống sẽ báo khi độ tin cậy từ ${state.notifyThreshold}% trở lên.`
+      });
+    }
   });
-  els.notifyThreshold.addEventListener("input", () => {
+  els.notifyThreshold.addEventListener("change", () => {
     state.notifyThreshold = Number(els.notifyThreshold.value) || 80;
     chrome.storage.local.set({ notifyThreshold: state.notifyThreshold });
+    if (state.notifyEnable) {
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "icons/logo.png",
+        title: `Cập nhật mức báo động`,
+        message: `Đã lưu! Sẽ thông báo khi độ tin cậy đạt ${state.notifyThreshold}%`
+      });
+    }
   });
   els.riskProfileSelect.addEventListener("change", () => {
     state.riskProfile = els.riskProfileSelect.value;
     chrome.storage.local.set({ riskProfile: state.riskProfile });
+    updateNoteBalance();
     render();
   });
+  if (els.tradeDurationSelect) {
+    els.tradeDurationSelect.addEventListener("change", () => {
+      state.tradeDuration = els.tradeDurationSelect.value;
+      chrome.storage.local.set({ tradeDuration: state.tradeDuration });
+      render();
+    });
+  }
   els.capitalInput.addEventListener("input", () => {
     state.capital = Math.max(0, Number(els.capitalInput.value) || 0);
     chrome.storage.local.set({ capital: state.capital });
+    updateNoteBalance();
     render();
   });
+  
+  if (els.btnHomeTab) {
+    els.btnHomeTab.addEventListener("click", () => {
+      els.btnHomeTab.classList.add("active");
+      els.btnNoteTab.classList.remove("active");
+      els.homeView.style.display = "block";
+      els.noteView.style.display = "none";
+    });
+    els.btnNoteTab.addEventListener("click", () => {
+      els.btnNoteTab.classList.add("active");
+      els.btnHomeTab.classList.remove("active");
+      els.homeView.style.display = "none";
+      els.noteView.style.display = "block";
+      updateNoteBalance();
+    });
+    els.btnAnalyzeNote.addEventListener("click", analyzeNoteTab);
+  }
+
   refresh();
 }
 
