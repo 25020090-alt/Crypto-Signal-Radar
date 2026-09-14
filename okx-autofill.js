@@ -104,45 +104,7 @@ if (typeof window.okxAutofillInjected === 'undefined') {
     return { filled, count };
   }
 
-  function getAvailableBalance() {
-    const panel = findOrderPanel();
-    if (!panel) return null;
-    
-    const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT, null, false);
-    const texts = [];
-    let node;
-    while ((node = walker.nextNode())) {
-      const val = node.nodeValue.trim();
-      if (val) texts.push(val);
-    }
-    
-    for (let i = 0; i < texts.length; i++) {
-      const text = texts[i].toLowerCase();
-      if (text.includes("khả dụng") || text.includes("avail")) {
-        const candidates = [texts[i], texts[i+1], texts[i+2], texts[i+3]].filter(Boolean);
-        for (const cand of candidates) {
-          const match = cand.match(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\b|\b\d+(?:\.\d+)?\b/);
-          if (match) {
-            const val = Number(match[0].replace(/,/g, ""));
-            if (!isNaN(val)) return val;
-          }
-        }
-      }
-    }
-    return null;
-  }
-
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type === "GET_OKX_INFO") {
-      try {
-        const balance = getAvailableBalance();
-        sendResponse({ ok: true, balance });
-      } catch (error) {
-        sendResponse({ ok: false, error: error.message });
-      }
-      return true;
-    }
-
     if (message?.type !== "FILL_OKX_ORDER") return false;
     try {
       const result = fillOkxOrder(message.payload);

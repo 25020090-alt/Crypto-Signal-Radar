@@ -585,39 +585,11 @@ async function refresh() {
   state.capital = Math.max(0, Number(els.capitalInput.value) || 0);
   state.riskProfile = els.riskProfileSelect.value;
   await chrome.storage.local.set({ symbol: state.symbol, interval: state.interval, capital: state.capital, riskProfile: state.riskProfile });
-  fetchOkxBalance(); // Lấy số dư mới mỗi khi refresh
   try {
     await loadInitialMarket();
   } catch (error) {
     console.error(error);
     setStatus("Không tải được dữ liệu", "error");
-  }
-}
-
-async function fetchOkxBalance() {
-  try {
-    const tabs = await chrome.tabs.query({ url: "*://*.okx.com/*" });
-    const tab = tabs.find((t) => t.active) || tabs[0];
-    if (!tab?.id) return;
-
-    let response;
-    try {
-      response = await chrome.tabs.sendMessage(tab.id, { type: "GET_OKX_INFO" });
-    } catch (error) {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["okx-autofill.js"] });
-      response = await chrome.tabs.sendMessage(tab.id, { type: "GET_OKX_INFO" });
-    }
-
-    if (response?.ok && typeof response.balance === "number" && !isNaN(response.balance)) {
-      if (state.capital !== response.balance) {
-        state.capital = response.balance;
-        els.capitalInput.value = state.capital;
-        chrome.storage.local.set({ capital: state.capital });
-        render();
-      }
-    }
-  } catch (error) {
-    console.warn("Không thể quét số dư OKX:", error.message);
   }
 }
 
@@ -675,8 +647,7 @@ async function boot() {
     render();
   });
   
-  await refresh();
-  fetchOkxBalance(); // Ngay khi bật lên điều đầu tiên là theo dõi số dư khả dụng
+  refresh();
 }
 
 boot();
