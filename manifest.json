@@ -15,6 +15,7 @@
   "permissions": ["storage", "sidePanel", "activeTab", "scripting", "tabs", "notifications"],
   "host_permissions": [
     "https://api.binance.com/*",
+    "https://fapi.binance.com/*",
     "wss://stream.binance.com:9443/*",
     "https://www.okx.com/*"
   ],

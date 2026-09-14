@@ -10,21 +10,28 @@
 
 <body>
   <main class="app-shell">
+    <!-- Top Navigation Tabs -->
     <nav class="tabs-nav">
-      <button id="btnHomeTab" class="tab-btn active">Radar</button>
-      <button id="btnNoteTab" class="tab-btn">Note</button>
+      <button id="btnHomeTab" class="tab-btn active">⚡ Radar Realtime</button>
+      <button id="btnNoteTab" class="tab-btn">🌐 Vĩ Mô & On-Chain</button>
+      <button id="btnHandbookTab" class="tab-btn">📖 Cẩm Nang Axiom</button>
     </nav>
 
+    <!-- TAB 1: RADAR VIEW -->
     <div id="homeView">
       <section class="hero card">
         <div>
-          <p class="eyebrow">Realtime Crypto AI</p>
+          <div class="hero-tags">
+            <span class="eyebrow">Axiom Quant Engine 2.0</span>
+            <span class="badge-source">Binance Spot + Futures</span>
+          </div>
           <h1>Crypto Signal Radar</h1>
-          <p class="muted">Phân tích kỹ thuật realtime từ giá, khối lượng, order book và động lượng thị trường.</p>
+          <p class="muted">Hệ thống phân tích 7 trụ cột: Order Flow (CVD/POC), SMC Liquidity, Wyckoff 2.0, Phái Sinh, On-Chain & Quant Z-Score.</p>
         </div>
         <div class="status" id="connectionStatus">Đang kết nối</div>
       </section>
 
+      <!-- Controls -->
       <section class="controls card">
         <label>
           Cặp giao dịch
@@ -37,7 +44,7 @@
             <option value="DOGEUSDT">DOGE/USDT</option>
             <option value="ADAUSDT">ADA/USDT</option>
             <option value="AVAXUSDT">AVAX/USDT</option>
-            <option value="NESUSDT">NESUSDT</option>
+            <option value="NESUSDT">NESUSDT (OKX)</option>
           </select>
         </label>
         <label style="display: none;">
@@ -51,37 +58,38 @@
           </select>
         </label>
         <label>
+          Thời gian giữ lệnh
+          <select id="tradeDurationSelect">
+            <option value="5m">5 phút (5p)</option>
+            <option value="15m" selected>15 phút (15p)</option>
+            <option value="1h">1 giờ (1h)</option>
+            <option value="4h">4 giờ (4h)</option>
+            <option value="1d">1 ngày (1ngay)</option>
+          </select>
+        </label>
+        <label>
           Vốn ví hiện tại (USDT)
           <input id="capitalInput" type="number" min="0" step="0.01" placeholder="Ví dụ: 100" />
         </label>
         <label>
           Mức độ rủi ro
           <select id="riskProfileSelect">
-            <option value="safe">An toàn</option>
-            <option value="balanced" selected>Cân bằng</option>
-            <option value="aggressive">Mạo hiểm</option>
-          </select>
-        </label>
-        <label>
-          Thời gian giữ lệnh
-          <select id="tradeDurationSelect">
-            <option value="scalping">Ngắn hạn (Vài chục phút)</option>
-            <option value="intraday" selected>Trong ngày (1 - 4h)</option>
-            <option value="swing">Dài hạn (Vài ngày)</option>
+            <option value="safe">An toàn (1% vốn)</option>
+            <option value="balanced" selected>Cân bằng (2% vốn)</option>
+            <option value="aggressive">Mạo hiểm (3% vốn)</option>
           </select>
         </label>
         <label>
           Báo động khi tin cậy &gt;= %
-          <div style="display: flex; gap: 8px;">
-            <input id="notifyEnable" type="checkbox" style="width: auto; height: 20px; align-self: center;"
-              title="Bật báo động" />
-            <input id="notifyThreshold" type="number" min="50" max="100" value="80" style="padding: 0 8px; flex: 1;"
-              title="Ngưỡng tin cậy (%)" />
+          <div style="display: flex; gap: 6px;">
+            <input id="notifyEnable" type="checkbox" style="width: auto; height: 20px; align-self: center;" title="Bật báo động" />
+            <input id="notifyThreshold" type="number" min="50" max="100" value="80" style="padding: 0 8px; flex: 1;" title="Ngưỡng tin cậy (%)" />
           </div>
         </label>
         <button id="refreshButton" type="button">Cập nhật</button>
       </section>
 
+      <!-- 4 Core Metrics -->
       <section class="price-grid">
         <article class="card metric">
           <span>Giá hiện tại</span>
@@ -89,108 +97,377 @@
           <small id="priceChange">--</small>
         </article>
         <article class="card metric">
-          <span>Tín hiệu</span>
+          <span>Tín hiệu tổng hợp</span>
           <strong id="signalText">--</strong>
           <small id="confidenceText">Độ tin cậy --</small>
         </article>
         <article class="card metric">
-          <span>Dự đoán gần</span>
+          <span>Dự đoán mục tiêu</span>
           <strong id="forecastText">--</strong>
           <small id="horizonText">15–60 phút</small>
         </article>
         <article class="card metric">
-          <span>Đòn bẩy nên dùng</span>
+          <span>Đòn bẩy khuyến nghị</span>
           <strong id="leverageText">--</strong>
-          <small id="leverageReason">Theo rủi ro hiện tại</small>
+          <small id="leverageReason">Theo biến động rủi ro</small>
         </article>
       </section>
 
-      <section class="card chart-card">
-        <div class="section-title">
-          <h2>Biểu đồ giá</h2>
-          <span id="updatedAt">--</span>
+      <!-- 4 Quick-Insight Badges (7 Pillars at a glance) -->
+      <section class="pillar-badges-grid">
+        <div class="pillar-badge" id="badgeOrderFlow">
+          <div class="pillar-label">1. Order Flow & Delta</div>
+          <div class="pillar-val" id="valOrderFlow">Đang tính...</div>
+          <div class="pillar-sub" id="subOrderFlow">POC & CVD Divergence</div>
         </div>
-        <canvas id="priceChart" width="620" height="260" aria-label="Price chart"></canvas>
+        <div class="pillar-badge" id="badgeSMC">
+          <div class="pillar-label">2. SMC Liquidity</div>
+          <div class="pillar-val" id="valSMC">Đang quét...</div>
+          <div class="pillar-sub" id="subSMC">BSL / SSL & FVG</div>
+        </div>
+        <div class="pillar-badge" id="badgeDerivatives">
+          <div class="pillar-label">3 & 4. Phái Sinh & OI</div>
+          <div class="pillar-val" id="valDerivatives">Đang tải...</div>
+          <div class="pillar-sub" id="subDerivatives">Funding & Max Pain</div>
+        </div>
+        <div class="pillar-badge" id="badgeQuant">
+          <div class="pillar-label">5 & 7. Quant & Wyckoff</div>
+          <div class="pillar-val" id="valQuant">Đang tính...</div>
+          <div class="pillar-sub" id="subQuant">Z-Score & UTAD</div>
+        </div>
       </section>
 
+      <!-- Chart Canvas -->
+      <section class="card chart-card">
+        <div class="section-title">
+          <div class="chart-header-left">
+            <h2>Biểu đồ Kỹ Thuật Đa Tầng</h2>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-box candle-up"></span>Tăng</span>
+              <span class="legend-item"><span class="legend-box candle-down"></span>Giảm</span>
+              <span class="legend-item"><span class="legend-line poc-line"></span>POC (Volume Profile)</span>
+              <span class="legend-item"><span class="legend-line bsl-line"></span>BSL</span>
+              <span class="legend-item"><span class="legend-line ssl-line"></span>SSL</span>
+              <span class="legend-item"><span class="legend-box fvg-box"></span>FVG Gap</span>
+            </div>
+          </div>
+          <span id="updatedAt">--</span>
+        </div>
+        <canvas id="priceChart" width="640" height="270" aria-label="Price chart"></canvas>
+      </section>
+
+      <!-- Deep Dive 4 Pillars Accordion / Grid -->
+      <section class="tech-pillars-grid">
+        <!-- Pillar 1: Order Flow -->
+        <article class="card tech-card">
+          <div class="tech-header">
+            <h3>📊 1. Order Flow & Footprint</h3>
+            <span class="tech-tag" id="tagOrderFlow">Delta Active</span>
+          </div>
+          <div class="tech-content" id="orderflowContent">
+            <div class="tech-row"><span>Candle Delta:</span> <strong id="ofCandleDelta">--</strong></div>
+            <div class="tech-row"><span>CVD (Xu hướng Delta):</span> <strong id="ofCVD">--</strong></div>
+            <div class="tech-row"><span>Volume Profile POC:</span> <strong id="ofPOC">--</strong></div>
+            <div class="tech-alert" id="ofAbsorptionAlert">Đang phân tích hấp thụ lực (Absorption)...</div>
+          </div>
+        </article>
+
+        <!-- Pillar 2: SMC -->
+        <article class="card tech-card">
+          <div class="tech-header">
+            <h3>🎯 2. SMC & Thanh Khoản</h3>
+            <span class="tech-tag" id="tagSMC">Liquidity Map</span>
+          </div>
+          <div class="tech-content" id="smcContent">
+            <div class="tech-row"><span>Buy-Side Liquidity (BSL):</span> <strong id="smcBSL">--</strong></div>
+            <div class="tech-row"><span>Sell-Side Liquidity (SSL):</span> <strong id="smcSSL">--</strong></div>
+            <div class="tech-row"><span>Fair Value Gap (FVG):</span> <strong id="smcFVG">--</strong></div>
+            <div class="tech-alert" id="smcSweepAlert">Đang theo dõi bẫy quét thanh khoản (Sweep)...</div>
+          </div>
+        </article>
+
+        <!-- Pillar 3 & 4: Derivatives & Options -->
+        <article class="card tech-card">
+          <div class="tech-header">
+            <h3>⚡ 3 & 4. Phái Sinh & Options</h3>
+            <span class="tech-tag" id="tagDerivatives">Binance Futures</span>
+          </div>
+          <div class="tech-content" id="derivativesContent">
+            <div class="tech-row"><span>Funding Rate (8h):</span> <strong id="derivFunding">--</strong></div>
+            <div class="tech-row"><span>Open Interest (OI):</span> <strong id="derivOI">--</strong></div>
+            <div class="tech-row"><span>Options Max Pain:</span> <strong id="derivMaxPain">--</strong></div>
+            <div class="tech-alert" id="derivSqueezeAlert">Theo dõi nguy cơ Long / Short Squeeze...</div>
+          </div>
+        </article>
+
+        <!-- Pillar 5 & 7: Quant & Wyckoff -->
+        <article class="card tech-card">
+          <div class="tech-header">
+            <h3>🔬 5 & 7. Quant & Wyckoff 2.0</h3>
+            <span class="tech-tag" id="tagQuant">Mean Reversion</span>
+          </div>
+          <div class="tech-content" id="quantContent">
+            <div class="tech-row"><span>Z-Score (20-bar Deviation):</span> <strong id="quantZScore">--</strong></div>
+            <div class="tech-row"><span>Pha Wyckoff:</span> <strong id="wyckoffPhase">--</strong></div>
+            <div class="tech-row"><span>Momentum Factor:</span> <strong id="quantMomentum">--</strong></div>
+            <div class="tech-alert" id="wyckoffAlert">Đang quét bẫy giá UTAD & VSA Anomaly...</div>
+          </div>
+        </article>
+      </section>
+
+      <!-- Classical Indicators & Strategy Plan -->
       <section class="analysis-grid">
         <article class="card">
-          <h2>Chỉ báo</h2>
+          <h2>Chỉ báo Bổ Trợ</h2>
           <div class="indicator-list" id="indicatorList"></div>
         </article>
         <article class="card">
-          <h2>Chiến lược</h2>
+          <h2>Kế Hoạch Khớp Lệnh Thông Minh</h2>
           <ul class="strategy" id="strategyList"></ul>
         </article>
       </section>
 
+      <!-- OKX Autofill Section -->
       <section class="card autofill-card">
         <div>
-          <h2>Điền lệnh OKX</h2>
-          <p class="muted">Chỉ điền entry, số lượng coin, TP/SL và đòn bẩy nếu tìm thấy ô nhập. App không bấm Long/Short
-            trên OKX.</p>
+          <h2>Điền lệnh OKX Tự Động</h2>
+          <p class="muted">Tự động tính Entry theo SMC/Order Flow, SL trên vùng Sweep, TP tại FVG đối ứng và điền form OKX.</p>
         </div>
         <div class="trade-buttons">
           <button id="fillLongButton" class="long-button" type="button">Chuẩn bị Long</button>
           <button id="fillShortButton" class="short-button" type="button">Chuẩn bị Short</button>
         </div>
-        <p class="fill-status" id="fillStatus">Mở OKX ở tab chính trước khi bấm.</p>
+        <p class="fill-status" id="fillStatus">Mở tab OKX Futures trước khi bấm để app tự điền form.</p>
       </section>
 
       <section class="card disclaimer">
-        Không phải lời khuyên tài chính. Crypto biến động mạnh; luôn dùng quản trị rủi ro, stop-loss và chỉ giao dịch số
-        vốn có thể mất.
+        ⚠️ Không phải lời khuyên tài chính. Crypto biến động mạnh; luôn tuân thủ nguyên tắc quản trị rủi ro, cắt lỗ dứt khoát và chỉ giao dịch với số vốn có thể chấp nhận mất.
       </section>
     </div> <!-- /homeView -->
 
+    <!-- TAB 2: MACRO & ON-CHAIN VIEW -->
     <div id="noteView" style="display: none;">
+      <!-- Capital Management -->
       <section class="card">
-        <h2>Báo Cáo Tài Chính (Tổng Quan)</h2>
+        <h2>Báo Cáo Tài Chính & Quản Lý Vốn</h2>
         <div class="metric-row">
           <span class="label">Số dư hiện tại:</span>
           <strong id="noteBalance" style="font-size: 1.2rem;">0 USDT</strong>
         </div>
         <div class="metric-row">
-          <span class="label">Rủi ro (Risk Profile):</span>
-          <strong id="noteRiskProfile" style="color: var(--text-muted)">Cân bằng</strong>
+          <span class="label">Mức độ rủi ro:</span>
+          <strong id="noteRiskProfile" style="color: var(--yellow);">Cân bằng (2%)</strong>
         </div>
-        <div class="metric-row" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-          <span class="label">Khuyến nghị vốn/lệnh:</span>
-          <strong id="noteMaxInvest" style="color: var(--accent); font-size: 1.2rem;">0 USDT</strong>
+        <div class="metric-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+          <span class="label">Mức cắt lỗ tối đa / lệnh:</span>
+          <strong id="noteMaxInvest" style="color: var(--green); font-size: 1.15rem;">0 USDT</strong>
         </div>
-        <p class="muted" style="margin-top: 8px;">Dựa trên nguyên tắc chỉ rủi ro 1-3% tổng tài khoản cho mỗi lệnh cắt
-          lỗ.</p>
+        <p class="muted" style="margin-top: 8px;">Nguyên tắc bất di bất dịch của Smart Money: Không bao giờ rủi ro quá 1-3% tổng tài khoản cho bất kỳ một lệnh nào.</p>
       </section>
 
+      <!-- 6. Inter-Market Analysis Panel -->
       <section class="card">
-        <h2>Analysis Giao dịch Vĩ mô</h2>
-        <p class="muted" style="margin-bottom: 12px;">Phân tích dòng tiền và xu hướng dài hạn (D1, H4) để lên kế hoạch.
-        </p>
+        <div class="tech-header">
+          <h2>🌐 6. Phân Tích Liên Thị Trường (Inter-Market)</h2>
+          <span class="tech-tag" id="interMarketStatusTag">Risk Assessment</span>
+        </div>
+        <p class="muted" style="margin-bottom: 12px;">Đọc mối tương quan vĩ mô trước khi quyết định Long/Short Bitcoin & Altcoins.</p>
+
+        <div class="intermarket-grid">
+          <div class="intermarket-box">
+            <div class="im-title">DXY (Đô La Mỹ)</div>
+            <div class="im-rule">DXY tăng ➔ Áp lực giảm lên Crypto. Tránh Long khi DXY tiếp cận kháng cự.</div>
+            <div class="im-badge" id="imDxyBadge">Nghịch chiều BTC</div>
+          </div>
+          <div class="intermarket-box">
+            <div class="im-title">US10Y (Lợi Suất Trái Phiếu)</div>
+            <div class="im-rule">Lợi suất tăng ➔ Vốn rút khỏi tài sản rủi ro (Risk-Off). Tiêu cực cho Crypto.</div>
+            <div class="im-badge" id="imUs10yBadge">Risk-Off Gauge</div>
+          </div>
+          <div class="intermarket-box">
+            <div class="im-title">SPX (Chứng Khoán Mỹ)</div>
+            <div class="im-rule">SPX xả hàng ➔ Tương quan hoảng loạn tăng vọt. Không nên Long ngược dòng SPX.</div>
+            <div class="im-badge" id="imSpxBadge">Đồng pha thị trường</div>
+          </div>
+          <div class="intermarket-box">
+            <div class="im-title">Gold (Vàng)</div>
+            <div class="im-rule">Vàng tăng cùng BTC trong chu kỳ nới lỏng tiền tệ và lạm phát tiền tệ fiat.</div>
+            <div class="im-badge" id="imGoldBadge">Store of Value</div>
+          </div>
+        </div>
+
+        <div class="macro-check-box" id="macroCheckAlert">
+          <strong>Quy tắc Axiom:</strong> "Trước khi vào lệnh BTC ➔ Luôn kiểm tra DXY và SPX. Nếu DXY tại kháng cự + SPX suy yếu ➔ Tuyệt đối không Long BTC."
+        </div>
+      </section>
+
+      <!-- 3. On-Chain Metrics Dashboard -->
+      <section class="card">
+        <h2>⛓️ 3. Thước Đo On-Chain Chu Kỳ (2024-2025)</h2>
+        <div class="onchain-grid">
+          <div class="onchain-card">
+            <div class="oc-name">MVRV Z-Score</div>
+            <div class="oc-desc">Đo thị giá so với giá trị thực (Realized Value).</div>
+            <div class="oc-status" id="ocMvrvStatus">Vùng Tích Lũy Lành Mạnh (1.5 - 2.8)</div>
+            <small class="muted">&lt; 0.1: Đáy hoảng loạn (Capitulation) | &gt; 7.0: Đỉnh chu kỳ xả hàng</small>
+          </div>
+          <div class="onchain-card">
+            <div class="oc-name">SOPR (Spent Output Profit Ratio)</div>
+            <div class="oc-desc">Tỷ lệ lãi/lỗ của coin đang được dịch chuyển trên mạng.</div>
+            <div class="oc-status" id="ocSoprStatus">SOPR ~ 1.02 (Thị trường có lãi nhẹ)</div>
+            <small class="muted">SOPR &lt; 1 kéo dài: Người nắm giữ bán lỗ ➔ Sắp cạn kiệt phe bán</small>
+          </div>
+          <div class="onchain-card">
+            <div class="oc-name">Exchange Netflow</div>
+            <div class="oc-desc">Lượng coin ròng chuyển vào/ra các sàn giao dịch.</div>
+            <div class="oc-status" id="ocNetflowStatus">Outflow ròng (Cá voi rút về ví lạnh)</div>
+            <small class="muted">Inflow tăng đột biến tại kháng cự = Cá voi chuẩn bị xả hàng</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Long-term Deep Dive -->
+      <section class="card">
+        <h2>Kế Hoạch Swing Vĩ Mô Theo Coin (D1 & H4)</h2>
+        <p class="muted" style="margin-bottom: 12px;">Phân tích cấu trúc dài hạn kết hợp đa khung thời gian để lên kế hoạch lệnh swing.</p>
 
         <div style="display: flex; gap: 8px; margin-bottom: 16px;">
           <input type="text" id="noteSymbolInput" placeholder="Ví dụ: BTCUSDT" style="flex: 1;" />
-          <button id="btnAnalyzeNote" type="button"
-            style="background: var(--accent); color: #000; font-weight: bold;">Phân tích</button>
+          <button id="btnAnalyzeNote" type="button" style="background: var(--green); color: #000; font-weight: bold;">Phân tích</button>
         </div>
 
         <div id="noteAnalysisLoading" class="muted" style="display: none; text-align: center; padding: 20px 0;">
-          Đang tải dữ liệu lịch sử từ sàn...
+          Đang tải dữ liệu lịch sử nến D1 & H4 từ sàn...
         </div>
 
         <div id="noteAnalysisResult" style="display: none;">
           <div class="analysis-box">
-            <h3 style="font-size: 0.95rem; margin-bottom: 6px; color: var(--text);">Phân tích Kỹ thuật</h3>
-            <p id="noteTechnicalText"
-              style="line-height: 1.5; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 12px;"></p>
+            <h3 style="font-size: 0.95rem; margin-bottom: 6px; color: var(--text);">Phân tích Cấu trúc & Dòng tiền</h3>
+            <p id="noteTechnicalText" style="line-height: 1.5; color: var(--muted); font-size: 0.9rem; margin-bottom: 12px;"></p>
 
-            <h3 style="font-size: 0.95rem; margin-bottom: 6px; color: var(--text);">Kế hoạch tỉ mỉ</h3>
-            <div id="notePlanText"
-              style="line-height: 1.6; color: var(--accent); font-size: 0.95rem; background: rgba(0, 255, 170, 0.05); padding: 10px; border-radius: 6px; border-left: 3px solid var(--accent);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 6px; color: var(--text);">Kế hoạch Thực Chiến Smart Money</h3>
+            <div id="notePlanText" style="line-height: 1.6; color: var(--green); font-size: 0.95rem; background: rgba(37, 208, 125, 0.08); padding: 12px; border-radius: 8px; border-left: 3px solid var(--green);">
             </div>
           </div>
         </div>
       </section>
     </div> <!-- /noteView -->
+
+    <!-- TAB 3: AXIOM HANDBOOK VIEW -->
+    <div id="handbookView" style="display: none;">
+      <section class="card">
+        <div class="tech-header">
+          <h2>📘 Sổ Tay Phân Tích Kỹ Thuật Crypto Toàn Diện</h2>
+          <span class="tech-tag" style="background: rgba(76, 201, 240, 0.2); color: var(--blue);">Axiom Blueprint</span>
+        </div>
+        <p class="muted" style="margin-bottom: 14px;">"Kỹ thuật không thiếu — thiếu người biết đọc tín hiệu." Dưới đây là 7 nguyên tắc cốt lõi được mã hóa trực tiếp trong extension.</p>
+
+        <div class="handbook-sections">
+          <!-- Item 1 -->
+          <details class="handbook-item" open>
+            <summary><b>1. Order Flow & Footprint Chart (Lớp sâu nhất của Price Action)</b></summary>
+            <div class="hb-body">
+              <p><b>Bản chất:</b> Đọc từng lệnh mua chủ động (Taker Buy) và bán chủ động (Taker Sell).</p>
+              <ul>
+                <li><b>Delta = Taker Buy - Taker Sell:</b> Đo lường bên nào đang nỗ lực thị trường áp đảo.</li>
+                <li><b>Absorption (Hấp thụ):</b> Delta dương cực đại nhưng giá không thể vượt đỉnh ➔ Smart money kê lệnh bán ẩn Iceberg hấp thụ hết lực mua retail. Chuẩn bị setup SHORT đảo chiều!</li>
+                <li><b>CVD Divergence (Phân kỳ CVD):</b> Giá BTC đẩy từ 60k lên 65k nhưng Delta/CVD âm liên tục ➔ Cá voi đang phân phối vào lệnh FOMO của retail. Setup Short khi giá retest 65k.</li>
+                <li><b>Volume Profile POC:</b> Vùng giá có khối lượng giao dịch lớn nhất phiên — giá đóng vai trò nam châm hút giá quay lại.</li>
+              </ul>
+            </div>
+          </details>
+
+          <!-- Item 2 -->
+          <details class="handbook-item" open>
+            <summary><b>2. Liquidity Mapping (Smart Money Concepts - SMC)</b></summary>
+            <div class="hb-body">
+              <p><b>Bản chất:</b> Thị trường dịch chuyển từ vùng thanh khoản này sang vùng thanh khoản khác.</p>
+              <ul>
+                <li><b>BSL (Buy-Side Liquidity):</b> Cụm Stop Loss của phe Short trên các đỉnh cũ.</li>
+                <li><b>SSL (Sell-Side Liquidity):</b> Cụm Stop Loss của phe Long dưới các đáy cũ.</li>
+                <li><b>FVG (Fair Value Gap):</b> Vùng giá nhảy vọt mất cân bằng 3 nến — giá luôn có xu hướng quay lại fill FVG trước khi tiếp diễn.</li>
+                <li><b>Quy trình Setup Chuẩn:</b>
+                  <ol style="margin: 4px 0 0 16px; padding: 0;">
+                    <li>Xác định vùng BSL/SSL phía trên/dưới.</li>
+                    <li>Chờ giá quét râu (Sweep) kích hoạt thanh khoản.</li>
+                    <li>Tìm nến từ chối (Rejection) hoặc FVG xuất hiện ngay sau sweep.</li>
+                    <li>Entry vào lệnh, SL ngay ngoài râu nến đã sweep.</li>
+                    <li>TP tại SSL đối ứng hoặc FVG chưa lấp.</li>
+                  </ol>
+                </li>
+              </ul>
+            </div>
+          </details>
+
+          <!-- Item 3 -->
+          <details class="handbook-item">
+            <summary><b>3. On-Chain Analysis (2024-2025)</b></summary>
+            <div class="hb-body">
+              <p><b>Bản chất:</b> Đọc dữ liệu chuyển động vốn thật từ sổ cái blockchain.</p>
+              <ul>
+                <li><b>MVRV Z-Score:</b> So sánh thị giá với Realized Value. &gt; 7 là vùng đỉnh xả hàng toàn thị trường.</li>
+                <li><b>SOPR:</b> Đo lường lợi nhuận thực hiện. SOPR &lt; 1 kéo dài ➔ Holder đang bán cắt lỗ trong tuyệt vọng ➔ Báo hiệu vùng cạn kiệt bán (Capitulation).</li>
+                <li><b>Exchange Inflow:</b> Coin đẩy lên sàn tăng đột biến khi giá tại kháng cự = Tín hiệu Short mạnh.</li>
+                <li><b>Funding Rate:</b> Long/Short trả phí cho nhau. Funding cực dương (+0.05% - 0.1%/8h) = Long quá đông ➔ Long Squeeze sắp quét sạch đòn bẩy!</li>
+              </ul>
+            </div>
+          </details>
+
+          <!-- Item 4 -->
+          <details class="handbook-item">
+            <summary><b>4. Derivatives Analysis (Thị Trường Phái Sinh & Options)</b></summary>
+            <div class="hb-body">
+              <p><b>Bản chất:</b> Đọc vị thế các tổ chức tài chính lớn và sàn phái sinh.</p>
+              <ul>
+                <li><b>Options Max Pain:</b> Mức giá khi hợp đồng Options đáo hạn sẽ khiến đa số người mua quyền chọn chịu lỗ tối đa ➔ Giá spot thường có xu hướng bị ghim hoặc kéo về gần Max Pain vào chiều thứ 6 hàng tuần.</li>
+                <li><b>Gamma Exposure (GEX):</b> Vùng giá Market Maker phải cân bằng phòng vệ rủi ro (Delta-hedge), tạo hiệu ứng ghìm biên độ.</li>
+                <li><b>Put/Call Ratio:</b> &gt; 1.0 phản ánh tâm lý phòng vệ hoảng loạn ➔ Tín hiệu mua nghịch đảo (Contrarian Buy Signal).</li>
+              </ul>
+            </div>
+          </details>
+
+          <!-- Item 5 -->
+          <details class="handbook-item">
+            <summary><b>5. Wyckoff 2.0 (Phát Hiện Thao Túng Cá Voi)</b></summary>
+            <div class="hb-body">
+              <p><b>4 Pha Vòng Đời:</b> Accumulation (Gom hàng, vol cạn) ➔ Markup (Đẩy giá, retail FOMO) ➔ Distribution (Phân phối đỉnh, vol dị thường) ➔ Markdown (Đạp giá rơi tự do).</p>
+              <ul>
+                <li><b>Dấu hiệu Phân phối (Distribution):</b> Khối lượng cực cao nhưng thân nến nhỏ (nỗ lực đẩy không tương xứng kết quả - VSA).</li>
+                <li><b>UTAD (Upthrust After Distribution):</b> Cú giật vượt đỉnh cũ chớp nhoáng dụ retail mua breakout rồi đóng nến tụt lại phía dưới với volume xả lớn. Đây là tín hiệu SHORT xác suất cao nhất của Wyckoff!</li>
+              </ul>
+            </div>
+          </details>
+
+          <!-- Item 6 -->
+          <details class="handbook-item">
+            <summary><b>6. Inter-Market Analysis (Liên Thị Trường)</b></summary>
+            <div class="hb-body">
+              <p><b>Ma Trận Tương Quan:</b></p>
+              <ul>
+                <li><b>DXY tăng:</b> Đồng USD mạnh lên hút thanh khoản ➔ Crypto thường chịu áp lực giảm.</li>
+                <li><b>US10Y tăng:</b> Lợi suất phi rủi ro cao khiến giới đầu tư tháo vốn khỏi tài sản mạo hiểm.</li>
+                <li><b>SPX giảm mạnh:</b> Tâm lý sợ hãi lan truyền toàn thị trường tài chính ➔ BTC dump theo.</li>
+                <li><b>Nguyên tắc:</b> DXY tại kháng cự + SPX suy yếu ➔ Tuyệt đối không được vào lệnh Long BTC.</li>
+              </ul>
+            </div>
+          </details>
+
+          <!-- Item 7 -->
+          <details class="handbook-item">
+            <summary><b>7. Machine Learning & Quant Signals (2024-2025)</b></summary>
+            <div class="hb-body">
+              <p><b>Tín Hiệu Định Lượng Thực Chiến:</b></p>
+              <ul>
+                <li><b>Z-Score Mean Reversion:</b> Khi giá lệch &gt; 2 độ lệch chuẩn (Z &gt; 2 hoặc Z &lt; -2) so với đường trung bình 20 kỳ ➔ Xác suất 95% giá sẽ hồi quy về vùng trung tâm.</li>
+                <li><b>Momentum Factor:</b> Các đồng coin có đà tăng đột phá duy trì trong 30 kỳ có xác suất tiếp diễn xu hướng vượt trội trong 7-14 kỳ tiếp theo.</li>
+                <li><b>Regime Detection:</b> Tự động nhận biết thị trường đang ở chu kỳ Trend (xu hướng) hay Choppy (đi ngang) để điều chỉnh hệ số đòn bẩy và stop loss tương ứng.</li>
+              </ul>
+            </div>
+          </details>
+        </div>
+      </section>
+    </div> <!-- /handbookView -->
+
   </main>
   <script src="popup.js"></script>
 </body>
